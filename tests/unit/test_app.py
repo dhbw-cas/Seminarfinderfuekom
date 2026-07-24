@@ -5,6 +5,7 @@ import pytest
 
 from app import (
     _read_positive_int_env,
+    build_system_prompt,
     llm_chat_openai_compatible,
     parse_recommendation_response,
     parse_seminars_from_catalog,
@@ -67,6 +68,25 @@ def test_parse_recommendation_response_keeps_only_known_seminar_ids() -> None:
     assert reasons == {
         "sicher-prasentieren": "Trifft den Wunsch nach Auftrittssicherheit."
     }
+
+
+def test_build_system_prompt_contains_strict_json_and_clarification_rules() -> None:
+    catalog = """
+### Kommunikation
+
+#### Sicher präsentieren
+**Fokus:** Auftritt und Rhetorik
+"""
+    seminars = parse_seminars_from_catalog(catalog)
+
+    prompt = build_system_prompt(catalog_text=catalog, seminars=seminars, top_n=2)
+
+    assert "genau eine gezielte Rückfrage" in prompt
+    assert "gib keine Seminar-IDs aus" in prompt
+    assert "Kein Markdown, keine Code-Fences" in prompt
+    assert '"recommended_ids": Liste mit maximal 2 Seminar-IDs' in prompt
+    assert "Weniger als 2 Empfehlungen sind erlaubt" in prompt
+    assert "Dualis für Modul und Veranstaltung" in prompt
 
 
 def test_llm_chat_openai_compatible_sends_openai_compatible_payload(
