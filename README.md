@@ -32,13 +32,21 @@ streamlit run app.py
 
 ## Sliplane Deployment
 
-Das Repo enthält ein `Dockerfile`, sodass Sliplane direkt aus GitHub bauen kann.
+Sliplane erkennt dieses Repo als Python-Projekt und baut es mit Railpack. Der
+benötigte Streamlit-Startbefehl ist deshalb explizit in `railpack.json`
+konfiguriert. Das `Dockerfile` bleibt als portable Docker-Variante im Repo.
 
 1. In Sliplane als Deploy Source `GitHub` wählen.
 2. Repository `dhbw-cas/Seminarfinderfuekom` auswählen.
 3. Service als HTTP-Service exposen.
 4. Healthcheck Route auf `/_stcore/health` setzen.
 5. Environment-Variablen konfigurieren.
+
+Railpack-Startbefehl aus `railpack.json`:
+
+```bash
+python -m streamlit run app.py --server.address=0.0.0.0 --server.port=${PORT:-8501} --server.headless=true
+```
 
 Pflicht:
 
@@ -55,7 +63,8 @@ ABACUS_STREAM=false
 CATALOG_FILE=data/catalog.md
 ```
 
-Sliplane setzt `PORT` automatisch. Das Container-Startkommando liest diese Variable zur Laufzeit und startet Streamlit auf `0.0.0.0:$PORT`.
+Sliplane setzt `PORT` automatisch. Der Railpack-Startbefehl liest diese Variable
+zur Laufzeit und startet Streamlit auf `0.0.0.0:$PORT`.
 
 ## Streamlit Cloud (streamlit.io)
 
