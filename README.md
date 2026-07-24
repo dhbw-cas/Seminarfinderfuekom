@@ -30,6 +30,33 @@ export ABACUS_API_KEY="..."
 streamlit run app.py
 ```
 
+## Sliplane Deployment
+
+Das Repo enthält ein `Dockerfile`, sodass Sliplane direkt aus GitHub bauen kann.
+
+1. In Sliplane als Deploy Source `GitHub` wählen.
+2. Repository `dhbw-cas/Seminarfinderfuekom` auswählen.
+3. Service als HTTP-Service exposen.
+4. Healthcheck Route auf `/_stcore/health` setzen.
+5. Environment-Variablen konfigurieren.
+
+Pflicht:
+
+```text
+ABACUS_API_KEY=...
+```
+
+Optional:
+
+```text
+ABACUS_API_URL=https://routellm.abacus.ai/v1/chat/completions
+ABACUS_MODEL=gpt-5-nano
+ABACUS_STREAM=false
+CATALOG_FILE=data/catalog.md
+```
+
+Sliplane setzt `PORT` automatisch. Das Container-Startkommando liest diese Variable zur Laufzeit und startet Streamlit auf `0.0.0.0:$PORT`.
+
 ## Streamlit Cloud (streamlit.io)
 
 In den App-Secrets setzen:
