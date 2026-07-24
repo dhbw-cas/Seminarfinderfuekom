@@ -11,9 +11,9 @@ import requests
 import streamlit as st
 
 DEFAULT_CATALOG_FILE = "data/catalog.md"
-DEFAULT_LLM_ENDPOINT = "https://openai.inference.de-txl.ionos.com/v1/chat/completions"
-DEFAULT_LLM_MODEL = "mistralai/Mistral-Small-24B-Instruct"
-DEFAULT_MAX_COMPLETION_TOKENS = 1000
+DEFAULT_LLM_ENDPOINT = "https://api.scaleway.ai/v1/chat/completions"
+DEFAULT_LLM_MODEL = "mistral/mistral-small-3.2-24b-instruct-2506:fp8"
+DEFAULT_MAX_TOKENS = 1000
 DEFAULT_RESULT_COUNT = 3
 TOPIC_KEYWORDS: dict[str, list[str]] = {
     "Selbstführung & Resilienz": [
@@ -432,7 +432,7 @@ def llm_chat_openai_compatible(
     system_prompt: str,
     history: list[dict[str, str]],
     stream: bool,
-    max_completion_tokens: int,
+    max_tokens: int,
 ) -> str:
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -443,7 +443,7 @@ def llm_chat_openai_compatible(
         "messages": [{"role": "system", "content": system_prompt}, *history],
         "temperature": 0.2,
         "stream": stream,
-        "max_completion_tokens": max_completion_tokens,
+        "max_tokens": max_tokens,
         "response_format": {"type": "json_object"},
     }
 
@@ -563,34 +563,32 @@ def main() -> None:
     st.write("Seminarfinder für die Fükom-Seminare.")
 
     catalog_file = os.getenv("CATALOG_FILE", DEFAULT_CATALOG_FILE)
-    llm_api_key = os.getenv("IONOS_API_TOKEN", "")
-    llm_endpoint = os.getenv("IONOS_API_URL", DEFAULT_LLM_ENDPOINT)
-    llm_model = os.getenv("IONOS_MODEL", DEFAULT_LLM_MODEL)
-    llm_stream = os.getenv("IONOS_STREAM", "false").lower() in {"1", "true", "yes"}
+    llm_api_key = os.getenv("LLM_API_KEY", "")
+    llm_endpoint = os.getenv("LLM_API_URL", DEFAULT_LLM_ENDPOINT)
+    llm_model = os.getenv("LLM_MODEL", DEFAULT_LLM_MODEL)
+    llm_stream = os.getenv("LLM_STREAM", "false").lower() in {"1", "true", "yes"}
     try:
-        llm_max_completion_tokens = _read_positive_int_env(
-            "IONOS_MAX_COMPLETION_TOKENS", DEFAULT_MAX_COMPLETION_TOKENS
-        )
+        llm_max_tokens = _read_positive_int_env("LLM_MAX_TOKENS", DEFAULT_MAX_TOKENS)
     except ValueError as exc:
-        st.error(f"Ungültige IONOS-Konfiguration: {exc}")
+        st.error(f"Ungültige LLM-Konfiguration: {exc}")
         st.stop()
 
     with st.sidebar:
         st.header("Konfiguration")
         st.caption("Der Katalog wird immer automatisch aus der Datei im Repo geladen.")
         st.text_input("Katalog-Datei", value=catalog_file, disabled=True)
-        st.text_input("IONOS API URL", value=llm_endpoint, disabled=True)
-        st.text_input("IONOS Modell", value=llm_model, disabled=True)
+        st.text_input("LLM API URL", value=llm_endpoint, disabled=True)
+        st.text_input("LLM Modell", value=llm_model, disabled=True)
         st.text_input(
             "Streaming", value="Aktiv" if llm_stream else "Inaktiv", disabled=True
         )
         st.text_input(
             "Max. Antwort-Tokens",
-            value=str(llm_max_completion_tokens),
+            value=str(llm_max_tokens),
             disabled=True,
         )
         st.text_input(
-            "IONOS_API_TOKEN gesetzt",
+            "LLM_API_KEY gesetzt",
             value="Ja" if llm_api_key else "Nein",
             disabled=True,
         )
@@ -627,7 +625,7 @@ def main() -> None:
 
     if not llm_api_key:
         st.error(
-            "IONOS_API_TOKEN ist nicht gesetzt. Bitte als Umgebungsvariable konfigurieren."
+            "LLM_API_KEY ist nicht gesetzt. Bitte als Umgebungsvariable konfigurieren."
         )
         st.stop()
 
@@ -673,7 +671,7 @@ def main() -> None:
                     ),
                     history=history,
                     stream=llm_stream,
-                    max_completion_tokens=llm_max_completion_tokens,
+                    max_tokens=llm_max_tokens,
                 )
                 answer, recommended_ids, reasons = parse_recommendation_response(
                     raw_text=raw_answer,
@@ -685,7 +683,7 @@ def main() -> None:
                 st.session_state["last_reasons"] = reasons
             except (requests.RequestException, ValueError, KeyError, TypeError) as exc:
                 answer = (
-                    "Beim Aufruf der IONOS AI Model Hub API ist ein Fehler aufgetreten. "
+                    "Beim Aufruf der LLM API ist ein Fehler aufgetreten. "
                     "Bitte prüfe API-Key, URL und Modell.\n\n"
                     f"Fehler: {exc}"
                 )

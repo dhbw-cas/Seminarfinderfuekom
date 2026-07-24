@@ -6,28 +6,26 @@ Diese App berät Studierende bei der Seminarwahl mit einem LLM und nutzt den Sem
 
 - Der Katalog wird **immer automatisch** aus einer Datei im Repo geladen.
 - Standardpfad: `data/catalog.md`
-- Der Chat nutzt die OpenAI-kompatible Chat-Completions-API des IONOS AI Model Hub.
+- Der Chat nutzt eine OpenAI-kompatible Chat-Completions-API. Standard ist Scaleway Generative APIs.
 - Antworten stützen sich auf den Katalog und bleiben im Chat kurz.
 - Passende Seminare werden als strukturierte Ergebnisse direkt unter dem Chat angezeigt.
 - Ergebnisse enthalten Filter-Chips und kompakte Badges (Kategorie, Dualis, Thema).
 
 ## Umgebungsvariablen
 
-- `IONOS_API_TOKEN` (Pflicht)
-- `IONOS_API_URL` (optional, Default: `https://openai.inference.de-txl.ionos.com/v1/chat/completions`)
-- `IONOS_MODEL` (optional, Default: `mistralai/Mistral-Small-24B-Instruct`)
-- `IONOS_STREAM` (optional, `true`/`false`, Default: `false`)
-- `IONOS_MAX_COMPLETION_TOKENS` (optional, Default: `1000`)
+- `LLM_API_KEY` (Pflicht, bei Scaleway: Secret Key)
+- `LLM_API_URL` (optional, Default: `https://api.scaleway.ai/v1/chat/completions`)
+- `LLM_MODEL` (optional, Default: `mistral/mistral-small-3.2-24b-instruct-2506:fp8`)
+- `LLM_STREAM` (optional, `true`/`false`, Default: `false`)
+- `LLM_MAX_TOKENS` (optional, Default: `1000`)
 - `CATALOG_FILE` (optional, Default: `data/catalog.md`)
 
 ## Lokal starten
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-export IONOS_API_TOKEN="..."
-streamlit run app.py
+uv sync
+export LLM_API_KEY="..."
+uv run streamlit run app.py
 ```
 
 ## Sliplane Deployment
@@ -51,16 +49,16 @@ python -m streamlit run app.py --server.address=0.0.0.0 --server.port=${PORT:-85
 Pflicht:
 
 ```text
-IONOS_API_TOKEN=...
+LLM_API_KEY=...
 ```
 
 Optional:
 
 ```text
-IONOS_API_URL=https://openai.inference.de-txl.ionos.com/v1/chat/completions
-IONOS_MODEL=mistralai/Mistral-Small-24B-Instruct
-IONOS_STREAM=false
-IONOS_MAX_COMPLETION_TOKENS=1000
+LLM_API_URL=https://api.scaleway.ai/v1/chat/completions
+LLM_MODEL=mistral/mistral-small-3.2-24b-instruct-2506:fp8
+LLM_STREAM=false
+LLM_MAX_TOKENS=1000
 CATALOG_FILE=data/catalog.md
 ```
 
@@ -72,21 +70,31 @@ zur Laufzeit und startet Streamlit auf `0.0.0.0:$PORT`.
 In den App-Secrets setzen:
 
 ```toml
-IONOS_API_TOKEN = "..."
-IONOS_API_URL = "https://openai.inference.de-txl.ionos.com/v1/chat/completions"
-IONOS_MODEL = "mistralai/Mistral-Small-24B-Instruct"
-IONOS_STREAM = "false"
-IONOS_MAX_COMPLETION_TOKENS = "1000"
+LLM_API_KEY = "..."
+LLM_API_URL = "https://api.scaleway.ai/v1/chat/completions"
+LLM_MODEL = "mistral/mistral-small-3.2-24b-instruct-2506:fp8"
+LLM_STREAM = "false"
+LLM_MAX_TOKENS = "1000"
 CATALOG_FILE = "data/catalog.md"
 ```
 
-## IONOS API-Test
+## Scaleway API-Test
 
-Token und Account-Zugriff lassen sich mit der Modellliste prüfen:
+Der Scaleway Secret Key wird als Bearer Token gesendet:
 
 ```bash
-curl -H "Authorization: Bearer $IONOS_API_TOKEN" \
-  https://openai.inference.de-txl.ionos.com/v1/models
+curl --request POST \
+  --url https://api.scaleway.ai/v1/chat/completions \
+  --header "Authorization: Bearer $LLM_API_KEY" \
+  --header "Content-Type: application/json" \
+  --data '{
+    "model": "mistral/mistral-small-3.2-24b-instruct-2506:fp8",
+    "messages": [
+      {"role": "user", "content": "Antworte kurz auf Deutsch: Funktioniert die API?"}
+    ],
+    "max_tokens": 100,
+    "temperature": 0.2
+  }'
 ```
 
-Die App nutzt für Textgenerierung `POST /v1/chat/completions` mit `Authorization: Bearer <IONOS_API_TOKEN>`.
+Die App nutzt für Textgenerierung `POST /v1/chat/completions` mit `Authorization: Bearer <LLM_API_KEY>`.
