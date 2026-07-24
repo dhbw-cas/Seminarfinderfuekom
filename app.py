@@ -11,8 +11,9 @@ import requests
 import streamlit as st
 
 DEFAULT_CATALOG_FILE = "data/catalog.md"
-DEFAULT_ABACUS_ENDPOINT = "https://routellm.abacus.ai/v1/chat/completions"
-DEFAULT_ABACUS_MODEL = "gpt-5-nano"
+DEFAULT_LLM_ENDPOINT = "https://openai.inference.de-txl.ionos.com/v1/chat/completions"
+DEFAULT_LLM_MODEL = "mistralai/Mistral-Small-24B-Instruct"
+DEFAULT_MAX_COMPLETION_TOKENS = 1000
 DEFAULT_RESULT_COUNT = 3
 TOPIC_KEYWORDS: dict[str, list[str]] = {
     "Selbstführung & Resilienz": [
@@ -150,6 +151,21 @@ def _normalize_dualis_code(raw_value: str) -> str:
     first_line = raw_value.splitlines()[0].strip()
     match = re.search(r"[A-Z]{3}\d+(?:\.\d+)+", first_line)
     return match.group(0) if match else first_line
+
+
+def _read_positive_int_env(name: str, default: int) -> int:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+
+    try:
+        value = int(raw_value)
+    except ValueError as exc:
+        raise ValueError(f"{name} muss eine ganze Zahl sein.") from exc
+
+    if value < 1:
+        raise ValueError(f"{name} muss größer als 0 sein.")
+    return value
 
 
 @st.cache_data(show_spinner=False)
@@ -409,13 +425,14 @@ def _extract_stream_response(response: requests.Response) -> str:
     return "".join(chunks).strip() or "Ich konnte keine Antwort vom Modell erhalten."
 
 
-def llm_chat_abacus(
+def llm_chat_openai_compatible(
     api_key: str,
     model: str,
     endpoint: str,
     system_prompt: str,
     history: list[dict[str, str]],
     stream: bool,
+    max_completion_tokens: int,
 ) -> str:
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -426,6 +443,8 @@ def llm_chat_abacus(
         "messages": [{"role": "system", "content": system_prompt}, *history],
         "temperature": 0.2,
         "stream": stream,
+        "max_completion_tokens": max_completion_tokens,
+        "response_format": {"type": "json_object"},
     }
 
     if stream:
@@ -544,23 +563,35 @@ def main() -> None:
     st.write("Seminarfinder für die Fükom-Seminare.")
 
     catalog_file = os.getenv("CATALOG_FILE", DEFAULT_CATALOG_FILE)
-    abacus_api_key = os.getenv("ABACUS_API_KEY", os.getenv("OPENAI_API_KEY", ""))
-    abacus_endpoint = os.getenv("ABACUS_API_URL", DEFAULT_ABACUS_ENDPOINT)
-    abacus_model = os.getenv("ABACUS_MODEL", DEFAULT_ABACUS_MODEL)
-    abacus_stream = os.getenv("ABACUS_STREAM", "false").lower() in {"1", "true", "yes"}
+    llm_api_key = os.getenv("IONOS_API_TOKEN", "")
+    llm_endpoint = os.getenv("IONOS_API_URL", DEFAULT_LLM_ENDPOINT)
+    llm_model = os.getenv("IONOS_MODEL", DEFAULT_LLM_MODEL)
+    llm_stream = os.getenv("IONOS_STREAM", "false").lower() in {"1", "true", "yes"}
+    try:
+        llm_max_completion_tokens = _read_positive_int_env(
+            "IONOS_MAX_COMPLETION_TOKENS", DEFAULT_MAX_COMPLETION_TOKENS
+        )
+    except ValueError as exc:
+        st.error(f"Ungültige IONOS-Konfiguration: {exc}")
+        st.stop()
 
     with st.sidebar:
         st.header("Konfiguration")
         st.caption("Der Katalog wird immer automatisch aus der Datei im Repo geladen.")
         st.text_input("Katalog-Datei", value=catalog_file, disabled=True)
-        st.text_input("Abacus API URL", value=abacus_endpoint, disabled=True)
-        st.text_input("Abacus Modell", value=abacus_model, disabled=True)
+        st.text_input("IONOS API URL", value=llm_endpoint, disabled=True)
+        st.text_input("IONOS Modell", value=llm_model, disabled=True)
         st.text_input(
-            "Streaming", value="Aktiv" if abacus_stream else "Inaktiv", disabled=True
+            "Streaming", value="Aktiv" if llm_stream else "Inaktiv", disabled=True
         )
         st.text_input(
-            "ABACUS_API_KEY gesetzt",
-            value="Ja" if abacus_api_key else "Nein",
+            "Max. Antwort-Tokens",
+            value=str(llm_max_completion_tokens),
+            disabled=True,
+        )
+        st.text_input(
+            "IONOS_API_TOKEN gesetzt",
+            value="Ja" if llm_api_key else "Nein",
             disabled=True,
         )
 
@@ -594,9 +625,9 @@ def main() -> None:
     if "last_reasons" not in st.session_state:
         st.session_state["last_reasons"] = {}
 
-    if not abacus_api_key:
+    if not llm_api_key:
         st.error(
-            "ABACUS_API_KEY ist nicht gesetzt. Bitte als Umgebungsvariable konfigurieren."
+            "IONOS_API_TOKEN ist nicht gesetzt. Bitte als Umgebungsvariable konfigurieren."
         )
         st.stop()
 
@@ -631,17 +662,18 @@ def main() -> None:
                     for m in st.session_state.messages
                     if m["role"] in {"user", "assistant"}
                 ]
-                raw_answer = llm_chat_abacus(
-                    api_key=abacus_api_key,
-                    model=abacus_model,
-                    endpoint=abacus_endpoint,
+                raw_answer = llm_chat_openai_compatible(
+                    api_key=llm_api_key,
+                    model=llm_model,
+                    endpoint=llm_endpoint,
                     system_prompt=build_system_prompt(
                         catalog_text=st.session_state["catalog_text"],
                         seminars=st.session_state["seminars"],
                         top_n=DEFAULT_RESULT_COUNT,
                     ),
                     history=history,
-                    stream=abacus_stream,
+                    stream=llm_stream,
+                    max_completion_tokens=llm_max_completion_tokens,
                 )
                 answer, recommended_ids, reasons = parse_recommendation_response(
                     raw_text=raw_answer,
@@ -653,7 +685,7 @@ def main() -> None:
                 st.session_state["last_reasons"] = reasons
             except (requests.RequestException, ValueError, KeyError, TypeError) as exc:
                 answer = (
-                    "Beim Aufruf der Abacus API ist ein Fehler aufgetreten. "
+                    "Beim Aufruf der IONOS AI Model Hub API ist ein Fehler aufgetreten. "
                     "Bitte prüfe API-Key, URL und Modell.\n\n"
                     f"Fehler: {exc}"
                 )

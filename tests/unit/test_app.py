@@ -1,4 +1,22 @@
-from app import parse_recommendation_response, parse_seminars_from_catalog
+import json
+from typing import Any
+
+import pytest
+
+from app import (
+    _read_positive_int_env,
+    llm_chat_openai_compatible,
+    parse_recommendation_response,
+    parse_seminars_from_catalog,
+)
+
+
+class FakeResponse:
+    def raise_for_status(self) -> None:
+        return None
+
+    def json(self) -> dict[str, Any]:
+        return {"choices": [{"message": {"content": '{"short_answer":"ok"}'}}]}
 
 
 def test_parse_seminars_from_catalog_extracts_required_fields() -> None:
@@ -49,3 +67,70 @@ def test_parse_recommendation_response_keeps_only_known_seminar_ids() -> None:
     assert reasons == {
         "sicher-prasentieren": "Trifft den Wunsch nach Auftrittssicherheit."
     }
+
+
+def test_llm_chat_openai_compatible_sends_ionos_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    def fake_post(
+        endpoint: str,
+        headers: dict[str, str],
+        data: str,
+        timeout: int,
+        stream: bool = False,
+    ) -> FakeResponse:
+        captured["endpoint"] = endpoint
+        captured["headers"] = headers
+        captured["payload"] = json.loads(data)
+        captured["timeout"] = timeout
+        captured["stream"] = stream
+        return FakeResponse()
+
+    monkeypatch.setattr("app.requests.post", fake_post)
+
+    answer = llm_chat_openai_compatible(
+        api_key="test-token",
+        model="mistralai/Mistral-Small-24B-Instruct",
+        endpoint="https://openai.inference.de-txl.ionos.com/v1/chat/completions",
+        system_prompt="Antworte als JSON.",
+        history=[{"role": "user", "content": "Hallo"}],
+        stream=False,
+        max_completion_tokens=1000,
+    )
+
+    assert answer == '{"short_answer":"ok"}'
+    assert (
+        captured["endpoint"]
+        == "https://openai.inference.de-txl.ionos.com/v1/chat/completions"
+    )
+    assert captured["headers"] == {
+        "Authorization": "Bearer test-token",
+        "Content-Type": "application/json",
+    }
+    assert captured["payload"] == {
+        "model": "mistralai/Mistral-Small-24B-Instruct",
+        "messages": [
+            {"role": "system", "content": "Antworte als JSON."},
+            {"role": "user", "content": "Hallo"},
+        ],
+        "temperature": 0.2,
+        "stream": False,
+        "max_completion_tokens": 1000,
+        "response_format": {"type": "json_object"},
+    }
+    assert captured["timeout"] == 120
+    assert captured["stream"] is False
+
+
+def test_read_positive_int_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("IONOS_MAX_COMPLETION_TOKENS", raising=False)
+    assert _read_positive_int_env("IONOS_MAX_COMPLETION_TOKENS", 1000) == 1000
+
+    monkeypatch.setenv("IONOS_MAX_COMPLETION_TOKENS", "1200")
+    assert _read_positive_int_env("IONOS_MAX_COMPLETION_TOKENS", 1000) == 1200
+
+    monkeypatch.setenv("IONOS_MAX_COMPLETION_TOKENS", "0")
+    with pytest.raises(ValueError, match="größer als 0"):
+        _read_positive_int_env("IONOS_MAX_COMPLETION_TOKENS", 1000)

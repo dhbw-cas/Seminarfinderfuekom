@@ -6,18 +6,18 @@ Diese App berät Studierende bei der Seminarwahl mit einem LLM und nutzt den Sem
 
 - Der Katalog wird **immer automatisch** aus einer Datei im Repo geladen.
 - Standardpfad: `data/catalog.md`
-- Der Chat nutzt die Abacus-AI-kompatible Chat-Completions-API.
+- Der Chat nutzt die OpenAI-kompatible Chat-Completions-API des IONOS AI Model Hub.
 - Antworten stützen sich auf den Katalog und bleiben im Chat kurz.
 - Passende Seminare werden als strukturierte Ergebnisse direkt unter dem Chat angezeigt.
 - Ergebnisse enthalten Filter-Chips und kompakte Badges (Kategorie, Dualis, Thema).
 
 ## Umgebungsvariablen
 
-- `ABACUS_API_KEY` (Pflicht)
-  - Fallback: `OPENAI_API_KEY`
-- `ABACUS_API_URL` (optional, Default: `https://routellm.abacus.ai/v1/chat/completions`)
-- `ABACUS_MODEL` (optional, Default: `gpt-5-nano`)
-- `ABACUS_STREAM` (optional, `true`/`false`, Default: `false`)
+- `IONOS_API_TOKEN` (Pflicht)
+- `IONOS_API_URL` (optional, Default: `https://openai.inference.de-txl.ionos.com/v1/chat/completions`)
+- `IONOS_MODEL` (optional, Default: `mistralai/Mistral-Small-24B-Instruct`)
+- `IONOS_STREAM` (optional, `true`/`false`, Default: `false`)
+- `IONOS_MAX_COMPLETION_TOKENS` (optional, Default: `1000`)
 - `CATALOG_FILE` (optional, Default: `data/catalog.md`)
 
 ## Lokal starten
@@ -26,7 +26,7 @@ Diese App berät Studierende bei der Seminarwahl mit einem LLM und nutzt den Sem
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-export ABACUS_API_KEY="..."
+export IONOS_API_TOKEN="..."
 streamlit run app.py
 ```
 
@@ -51,15 +51,16 @@ python -m streamlit run app.py --server.address=0.0.0.0 --server.port=${PORT:-85
 Pflicht:
 
 ```text
-ABACUS_API_KEY=...
+IONOS_API_TOKEN=...
 ```
 
 Optional:
 
 ```text
-ABACUS_API_URL=https://routellm.abacus.ai/v1/chat/completions
-ABACUS_MODEL=gpt-5-nano
-ABACUS_STREAM=false
+IONOS_API_URL=https://openai.inference.de-txl.ionos.com/v1/chat/completions
+IONOS_MODEL=mistralai/Mistral-Small-24B-Instruct
+IONOS_STREAM=false
+IONOS_MAX_COMPLETION_TOKENS=1000
 CATALOG_FILE=data/catalog.md
 ```
 
@@ -71,17 +72,21 @@ zur Laufzeit und startet Streamlit auf `0.0.0.0:$PORT`.
 In den App-Secrets setzen:
 
 ```toml
-ABACUS_API_KEY = "..."
-ABACUS_API_URL = "https://routellm.abacus.ai/v1/chat/completions"
-ABACUS_MODEL = "gpt-5-nano"
-ABACUS_STREAM = "false"
+IONOS_API_TOKEN = "..."
+IONOS_API_URL = "https://openai.inference.de-txl.ionos.com/v1/chat/completions"
+IONOS_MODEL = "mistralai/Mistral-Small-24B-Instruct"
+IONOS_STREAM = "false"
+IONOS_MAX_COMPLETION_TOKENS = "1000"
 CATALOG_FILE = "data/catalog.md"
 ```
 
-## Hinweis zur Abacus-Beispielintegration
+## IONOS API-Test
 
-Die Implementierung folgt dem von dir gezeigten Muster:
+Token und Account-Zugriff lassen sich mit der Modellliste prüfen:
 
-- `Authorization: Bearer <api_key>`
-- `POST` auf `https://routellm.abacus.ai/v1/chat/completions`
-- optionales Streaming via `data: ...` Zeilen und `[DONE]`
+```bash
+curl -H "Authorization: Bearer $IONOS_API_TOKEN" \
+  https://openai.inference.de-txl.ionos.com/v1/models
+```
+
+Die App nutzt für Textgenerierung `POST /v1/chat/completions` mit `Authorization: Bearer <IONOS_API_TOKEN>`.
