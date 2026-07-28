@@ -593,13 +593,13 @@ def render_recommendations(
 
 def main() -> None:
     st.set_page_config(
-        page_title="Seminarfinder-Chatbot",
+        page_title="FüKom-Kompass",
         page_icon="🎓",
         layout="wide",
         initial_sidebar_state="collapsed",
     )
-    st.title("🎓 Seminarfinder-Chatbot")
-    st.write("Seminarfinder für die Fükom-Seminare.")
+    st.title("FüKom-Kompass")
+    st.write("Dein Wegweiser durch das FüKom-Modul und die Seminarwahl.")
 
     catalog_file = os.getenv("CATALOG_FILE", DEFAULT_CATALOG_FILE)
     course_knowledge_file = os.getenv(
@@ -698,7 +698,7 @@ def main() -> None:
         st.session_state.messages = [
             {
                 "role": "assistant",
-                "content": "Hi! Ich berate dich zur Seminarwahl und zum FüKom-Modul. Was möchtest du wissen?",
+                "content": "Hi! Ich bin dein FüKom-Kompass. Ich unterstütze dich bei Fragen zum Modul und bei der Seminarwahl. Was möchtest du wissen?",
             }
         ]
 
@@ -709,7 +709,9 @@ def main() -> None:
     seminars_by_id = {
         seminar.seminar_id: seminar for seminar in st.session_state["seminars"]
     }
-    user_prompt = st.chat_input("z. B. Ich möchte meine Selbstsicherheit steigern.")
+    user_prompt = st.chat_input(
+        "z. B. Was brauche ich für das Testat? Oder: Welches Seminar stärkt meine Präsentationskompetenz?"
+    )
     if user_prompt:
         st.session_state.messages.append({"role": "user", "content": user_prompt})
         with st.chat_message("user"):
