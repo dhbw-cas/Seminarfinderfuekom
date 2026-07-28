@@ -1,13 +1,17 @@
 # Seminarfinder-Chatbot
 
-Diese App berät Studierende bei der Seminarwahl mit einem LLM und nutzt den Seminar-Katalog als Wissensbasis.
+Diese App berät Studierende bei der Seminarwahl und zu organisatorischen Fragen
+rund um das FüKom-Modul. Als Wissensbasis dienen der Seminar-Katalog und
+redaktionell aufbereitete Inhalte aus dem Moodle-Kurs.
 
 ## Verhalten
 
 - Der Katalog wird **immer automatisch** aus einer Datei im Repo geladen.
 - Standardpfad: `data/catalog.md`
+- Das Kurswissen wird ebenfalls automatisch geladen.
+- Standardpfad: `data/moodle_course.md`
 - Der Chat nutzt eine OpenAI-kompatible Chat-Completions-API. Standard ist Scaleway Generative APIs.
-- Antworten stützen sich auf den Katalog und bleiben im Chat kurz.
+- Antworten stützen sich auf das Kurswissen und den Katalog und bleiben im Chat kurz.
 - Passende Seminare werden als strukturierte Ergebnisse direkt unter dem Chat angezeigt.
 - Ergebnisse enthalten Filter-Chips und kompakte Badges (Kategorie, Dualis, Thema).
 
@@ -19,6 +23,7 @@ Diese App berät Studierende bei der Seminarwahl mit einem LLM und nutzt den Sem
 - `LLM_STREAM` (optional, `true`/`false`, Default: `false`)
 - `LLM_MAX_TOKENS` (optional, Default: `1000`)
 - `CATALOG_FILE` (optional, Default: `data/catalog.md`)
+- `COURSE_KNOWLEDGE_FILE` (optional, Default: `data/moodle_course.md`)
 
 ## Lokal starten
 
@@ -60,6 +65,7 @@ LLM_MODEL=mistral/mistral-small-3.2-24b-instruct-2506:fp8
 LLM_STREAM=false
 LLM_MAX_TOKENS=1000
 CATALOG_FILE=data/catalog.md
+COURSE_KNOWLEDGE_FILE=data/moodle_course.md
 ```
 
 Sliplane setzt `PORT` automatisch. Der Railpack-Startbefehl liest diese Variable
@@ -76,6 +82,7 @@ LLM_MODEL = "mistral/mistral-small-3.2-24b-instruct-2506:fp8"
 LLM_STREAM = "false"
 LLM_MAX_TOKENS = "1000"
 CATALOG_FILE = "data/catalog.md"
+COURSE_KNOWLEDGE_FILE = "data/moodle_course.md"
 ```
 
 ## Scaleway API-Test

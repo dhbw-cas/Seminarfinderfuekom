@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -7,6 +8,7 @@ from app import (
     _read_positive_int_env,
     build_system_prompt,
     llm_chat_openai_compatible,
+    load_course_knowledge_from_file,
     parse_recommendation_response,
     parse_seminars_from_catalog,
 )
@@ -18,6 +20,24 @@ class FakeResponse:
 
     def json(self) -> dict[str, Any]:
         return {"choices": [{"message": {"content": '{"short_answer":"ok"}'}}]}
+
+
+def test_load_course_knowledge_from_file_rejects_empty_file(tmp_path: Path) -> None:
+    knowledge_file = tmp_path / "course.md"
+    knowledge_file.write_text("Testat und Modulablauf", encoding="utf-8")
+
+    assert (
+        load_course_knowledge_from_file(
+            str(knowledge_file), knowledge_file.stat().st_mtime
+        )
+        == "Testat und Modulablauf"
+    )
+
+    empty_file = tmp_path / "empty.md"
+    empty_file.write_text("  \n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Kurswissensdatei ist leer"):
+        load_course_knowledge_from_file(str(empty_file), empty_file.stat().st_mtime)
 
 
 def test_parse_seminars_from_catalog_extracts_required_fields() -> None:
@@ -70,6 +90,33 @@ def test_parse_recommendation_response_keeps_only_known_seminar_ids() -> None:
     }
 
 
+def test_parse_recommendation_response_respects_explicit_empty_ids() -> None:
+    seminars = parse_seminars_from_catalog(
+        """
+### Kommunikation
+
+#### Sicher präsentieren
+**Fokus:** Auftritt und Rhetorik
+"""
+    )
+    raw_response = """{
+        "short_answer": "Für das Testat brauchst du alle Pflichtbestandteile.",
+        "recommended_ids": [],
+        "why": {}
+    }"""
+
+    answer, recommended_ids, reasons = parse_recommendation_response(
+        raw_text=raw_response,
+        seminars=seminars,
+        user_prompt="Welches Seminar brauche ich für das Testat?",
+        top_n=3,
+    )
+
+    assert answer == "Für das Testat brauchst du alle Pflichtbestandteile."
+    assert recommended_ids == []
+    assert reasons == {}
+
+
 def test_build_system_prompt_contains_strict_json_and_clarification_rules() -> None:
     catalog = """
 ### Kommunikation
@@ -79,7 +126,13 @@ def test_build_system_prompt_contains_strict_json_and_clarification_rules() -> N
 """
     seminars = parse_seminars_from_catalog(catalog)
 
-    prompt = build_system_prompt(catalog_text=catalog, seminars=seminars, top_n=2)
+    course_knowledge = "Das Testat umfasst 5 ECTS-Leistungspunkte."
+    prompt = build_system_prompt(
+        catalog_text=catalog,
+        course_knowledge=course_knowledge,
+        seminars=seminars,
+        top_n=2,
+    )
 
     assert "genau eine gezielte Rückfrage" in prompt
     assert "gib keine Seminar-IDs aus" in prompt
@@ -87,6 +140,16 @@ def test_build_system_prompt_contains_strict_json_and_clarification_rules() -> N
     assert '"recommended_ids": Liste mit maximal 2 Seminar-IDs' in prompt
     assert "Weniger als 2 Empfehlungen sind erlaubt" in prompt
     assert "Dualis für Modul und Veranstaltung" in prompt
+    assert course_knowledge in prompt
+    assert "digitale FüKom-Kurs- und Seminarberater" in prompt
+    assert "Modulaufbau, Testat, ECTS, Anmeldung" in prompt
+    assert "eine leere Liste recommended_ids" in prompt
+    assert "keinen Zugriff auf persönliche Moodle- oder Dualis-Daten" in prompt
+    assert "maximal 8 Sätze" in prompt
+    assert "(Quelle: Prüfungsleistung und Abschluss)" in prompt
+    assert "Frage: Wie melde ich mich zu einem Seminar an?" in prompt
+    assert "<kurswissen>" in prompt
+    assert "<seminar_katalog>" in prompt
 
 
 def test_llm_chat_openai_compatible_sends_openai_compatible_payload(
